@@ -1,0 +1,33 @@
+{
+  "name": "Money Map",
+  "short_name": "Money Map",
+  "description": "See where your money goes from your bank statements. Everything stays on your phone.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f3ef",
+  "theme_color": "#f4f3ef",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ],
+  "share_target": {
+    "action": "./share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "files": [{
+        "name": "statements",
+        "accept": ["application/pdf", ".pdf", "application/vnd.ms-excel", ".xls",
+                   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx",
+                   "text/csv", ".csv", "text/plain", ".txt", "application/octet-stream"]
+      }]
+    }
+  }
+}
