@@ -207,6 +207,27 @@ td.date .yr{font-size:11.5px;color:var(--muted);margin-top:1px}
 @media (max-width:820px){.catform{grid-template-columns:56px 1fr}.catform select,.catform #cfWords{grid-column:1/-1}.overlay{padding:0}.sheet{border-radius:0;min-height:100%}}
 header.top .btn{white-space:nowrap}
 @media (max-width:560px){header.top #btnClear{display:none !important}.nag > span:first-child{flex:1 1 100% !important}header.top{gap:6px}header.top .lbl{display:none}header.top .btn{padding:8px 10px}.logo{font-size:17px;gap:8px}.logo-mark{width:28px;height:28px}}
+.bg{padding:10px 0;border-bottom:1px solid var(--border)}
+.bg:last-child{border-bottom:0}
+.bg .top{display:flex;align-items:baseline;gap:8px;font-size:14px}
+.bg .top .nm{flex:1;font-weight:500}
+.bg .top .v{font-variant-numeric:tabular-nums;color:var(--text-2);font-size:13px}
+.bg .track{position:relative;height:8px;background:var(--surface-2);border-radius:5px;margin:6px 0 4px;overflow:hidden}
+.bg .track i{display:block;height:100%;border-radius:5px}
+.bg .track b{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--text-2);opacity:.55}
+.bg .st{font-size:12.5px;color:var(--text-2);display:flex;gap:10px;flex-wrap:wrap}
+.bgrow{display:grid;grid-template-columns:28px 1fr 120px auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px}
+.bgrow input[type=number]{border:1px solid var(--border);background:var(--surface-2);border-radius:8px;padding:7px 9px;width:100%;box-sizing:border-box;font-variant-numeric:tabular-nums}
+.bgrow .avg{color:var(--muted);font-size:12px}
+.bgrow label{font-size:12.5px;color:var(--text-2);display:flex;gap:5px;align-items:center;white-space:nowrap}
+.up{display:grid;grid-template-columns:56px 1fr auto;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:14px}
+.up:last-child{border-bottom:0}
+.up .d{text-align:center;background:var(--surface-2);border-radius:10px;padding:5px 0;line-height:1.15}
+.up .d b{display:block;font-size:17px}
+.up .d span{font-size:11px;color:var(--text-2);text-transform:uppercase;letter-spacing:.04em}
+.up .meta{color:var(--muted);font-size:12px}
+.up .amt{font-weight:600;font-variant-numeric:tabular-nums}
+@media (max-width:820px){.plan{grid-template-columns:1fr}.bgrow{grid-template-columns:24px 1fr 96px}.bgrow label{grid-column:2/-1}}
 .hidden{display:none !important}
 @media (max-width:820px){
   .stats{grid-template-columns:repeat(2,1fr)}
@@ -277,6 +298,18 @@ header.top .btn{white-space:nowrap}
         <h2>Where your income went</h2>
         <p class="sub">Needs, wants and savings as a share of money in. A common guideline is 50 / 30 / 20.</p>
         <div id="split"></div>
+      </div>
+    </div>
+    <div class="grid2 plan">
+      <div class="card" id="budgetCard">
+        <div style="display:flex;gap:10px;align-items:flex-start"><div style="flex:1"><h2 id="bgTitle">Budgets</h2><p class="sub" id="bgSub">Monthly limits per category.</p></div>
+          <button class="btn" id="btnBudgets" style="font-size:13px">Set budgets</button></div>
+        <div id="budgets"></div>
+      </div>
+      <div class="card" id="upCard">
+        <h2>Coming up</h2>
+        <p class="sub" id="upSub">Regular payments expected in the next 30 days, based on your past statements.</p>
+        <div id="upcoming"></div>
       </div>
     </div>
     <div class="card review" id="reviewCard" style="margin-bottom:14px">
@@ -372,10 +405,25 @@ header.top .btn{white-space:nowrap}
       </form>
     </section>
     <section>
+      <h3>📅 When does your month start?</h3>
+      <p class="hint">If you plan around payday, start each month on that day (e.g. 25th → 25 Oct – 24 Nov counts as November). Totals, budgets, charts and the score all follow it.</p>
+      <div class="row2"><label class="hint" for="msSel">Month starts on</label><select id="msSel" class="cat" style="max-width:none"></select></div>
+      <div class="hint" id="msSuggest" style="margin-top:8px"></div>
+    </section>
+    <section>
       <h3>📦 Storage</h3>
       <div class="hint" id="storeInfo"></div>
       <div class="row2"><button class="btn danger" id="btnClear2">Clear data…</button></div>
     </section>
+  </div>
+</div>
+<div class="overlay hidden" id="bsheet" role="dialog" aria-modal="true" aria-labelledby="bsTitle">
+  <div class="sheet">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><h2 id="bsTitle" style="flex:1;margin:0;font-size:18px">Set monthly budgets</h2><button class="btn ghost" id="bsClose" aria-label="Close">✕</button></div>
+    <p class="hint">Leave a box empty for no budget. <b>Roll over</b> carries what's left (or overspent) into next month, which suits bills that don't come every month, like insurance, school fees, car service or Diwali.</p>
+    <div class="row2" style="margin-bottom:6px"><button class="btn" id="bsAvg">Fill empty boxes with my averages</button></div>
+    <div id="bsList"></div>
+    <div class="row2" style="justify-content:flex-end;margin-top:14px;position:sticky;bottom:0;background:var(--surface);padding:10px 0"><button class="btn ghost" id="bsCancel">Cancel</button><button class="btn primary" id="bsSave">Save budgets</button></div>
   </div>
 </div>
 <input type="file" id="restoreFile" accept=".json,application/json" class="hidden">
@@ -1039,7 +1087,7 @@ const fmt2 = new Intl.NumberFormat('en-IN', {style:'currency', currency:'INR', m
 const money = v => fmt.format(Math.round(v));
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-let S = {txns: [], rules: {}, reviewed: {}, overrides: {}, year: 'all', month: 'all', cat: null, q: '', limit: 60};
+let S = {txns: [], rules: {}, reviewed: {}, overrides: {}, budgets: {}, monthStart: 1, year: 'all', month: 'all', cat: null, q: '', limit: 60};
 
 /* ---------- storage: IndexedDB (large, durable), with localStorage as fallback ---------- */
 const IDB = (() => {
@@ -1057,7 +1105,7 @@ const IDB = (() => {
 function snapshot(){
   return {v: 2, savedAt: new Date().toISOString(),
     txns: S.txns.map(t => { const o = {id: t.id, date: t.date, desc: t.desc, amount: t.amount}; if(t.alt) o.alt = t.alt; if(t.override) o.override = t.override; return o; }),
-    rules: S.rules, reviewed: S.reviewed, overrides: S.overrides, holder: S.holder || null, customCats: S.customCats || [], lastBackup: S.lastBackup || null};
+    rules: S.rules, reviewed: S.reviewed, overrides: S.overrides, holder: S.holder || null, customCats: S.customCats || [], lastBackup: S.lastBackup || null, monthStart: S.monthStart || 1, budgets: S.budgets || {}};
 }
 let saveT = null, storageMode = 'idb';
 function save(){
@@ -1086,7 +1134,7 @@ function applyData(d){
   try{
     if(d && Array.isArray(d.txns)){
       S.rules = d.rules || {}; S.reviewed = d.reviewed || {}; S.overrides = d.overrides || {}; S.holder = d.holder || null;
-      S.customCats = Array.isArray(d.customCats) ? d.customCats : []; S.lastBackup = d.lastBackup || null; applyCustomCats();
+      S.customCats = Array.isArray(d.customCats) ? d.customCats : []; S.lastBackup = d.lastBackup || null; S.monthStart = +d.monthStart || 1; S.budgets = d.budgets || {}; applyCustomCats();
       (d.txns || []).forEach(t => { if(t.override && t.date && typeof t.amount === 'number') S.overrides[`${t.date}|${t.amount.toFixed(2)}`] = t.override; });
       const RENAMED = {'Health & Fitness': 'Medical', 'Investment Returns': 'Investment Withdrawals'};
       for(const k in S.rules) if(RENAMED[S.rules[k]]) S.rules[k] = RENAMED[S.rules[k]];
@@ -1327,7 +1375,33 @@ function periodKey(){ return S.month !== 'all' ? S.month : S.year !== 'all' ? S.
 // This stops a month from showing two salaries (one early, one late) and the next month none.
 const SAL_EARLY_DAY = 7;
 function prevMonth(ym){ let [y, m] = ym.split('-').map(Number); m--; if(!m){ m = 12; y--; } return `${y}-${String(m).padStart(2, '0')}`; }
-function pkey(t){ const ym = t.date.slice(0, 7); return (t.amount > 0 && +t.date.slice(8, 10) <= SAL_EARLY_DAY && catOf(t) === 'Salary') ? prevMonth(ym) : ym; }
+function nextMonth(ym){ let [y, m] = ym.split('-').map(Number); m++; if(m > 12){ m = 1; y++; } return `${y}-${String(m).padStart(2, '0')}`; }
+// Month cycles: with a start day D > 1 (e.g. 25), 25 Oct – 24 Nov is one "month". It's named after the month most of it falls in.
+const MS = () => S.monthStart || 1;
+function cycleOf(date){
+  const D = MS(), ym = date.slice(0, 7); if(D === 1) return ym;
+  const start = +date.slice(8, 10) >= D ? ym : prevMonth(ym);
+  return D > 15 ? nextMonth(start) : start;
+}
+function cycleRange(label){
+  const D = MS(); if(D === 1) return null;
+  const start = D > 15 ? prevMonth(label) : label, end = nextMonth(start);
+  const f = (ym, d, yr) => { const [y, m] = ym.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-IN', {day: 'numeric', month: 'short', ...(yr ? {year: 'numeric'} : {})}); };
+  return `${f(start, D)} – ${f(end, D - 1, true)}`;
+}
+function pkey(t){
+  if(MS() > 1) return cycleOf(t.date);
+  const ym = t.date.slice(0, 7); return (t.amount > 0 && +t.date.slice(8, 10) <= SAL_EARLY_DAY && catOf(t) === 'Salary') ? prevMonth(ym) : ym;
+}
+const inDelPeriod = (t, pk) => MS() > 1 && pk.length > 4 ? pkey(t) === pk : t.date.startsWith(pk);
+const ordinal = n => n + (n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th');
+const shifted = t => MS() === 1 && pkey(t) !== t.date.slice(0, 7);
+function suggestMonthStart(){
+  const days = S.txns.filter(t => t.amount > 0 && catOf(t) === 'Salary').map(t => { const d = +t.date.slice(8, 10); return d <= 7 ? d + 31 : d; }).sort((a, b) => a - b);
+  if(days.length < 2) return null;
+  const early = days[Math.floor(days.length * 0.1)];
+  return Math.max(15, Math.min(25, early - 3));
+}
 function inPeriod(){ const k = periodKey(); return k ? S.txns.filter(t => pkey(t).startsWith(k)) : S.txns; }
 function allMonths(){ return [...new Set(S.txns.map(pkey))].sort(); }
 const monOnly = ym => { const [y, m] = ym.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleString('en-IN', {month: 'short'}); };
@@ -1358,16 +1432,17 @@ function render(){
   }
   const pk = periodKey();
   if(pk){
-    const n = S.txns.filter(t => t.date.startsWith(pk)).length;
+    const n = S.txns.filter(t => inDelPeriod(t, pk)).length;
     ph += `<div><button class="btn ghost" id="btnDelPeriod" style="font-size:13px;padding:5px 10px">🗑 Delete ${pk.length === 4 ? 'all of ' + pk : monthLabel(pk)} (${n} transaction${n === 1 ? '' : 's'})</button></div>`;
   }
+  if(S.month !== 'all' && MS() > 1) ph += `<div class="hint" style="margin-left:4px">📅 ${esc(cycleRange(S.month))} · months start on the ${ordinal(MS())}</div>`;
   $('months').innerHTML = ph;
   const list = inPeriod();
   const T = totals(list);
   const rate = T.inc > 0 ? Math.round((T.inc - T.spent - T.big) / T.inc * 100) : null;
   const nMonths = S.month !== 'all' ? 1 : S.year !== 'all' ? months.filter(m => m.startsWith(S.year)).length : months.length;
   $('stats').innerHTML = `
-    <div class="stat"><div class="label"><span class="dot" style="background:var(--s-in)"></span>Money in</div><div class="value">${money(T.inc)}</div><div class="note">${(n => n + (n === 1 ? ' credit' : ' credits'))(list.filter(t => kindOf(t) === 'income').length)}${list.some(t => pkey(t) !== t.date.slice(0, 7)) || (S.month !== 'all' && S.txns.some(t => t.date.startsWith(S.month) && pkey(t) !== S.month && catOf(t) === 'Salary')) ? ' · salary counted for the month earned' : ''}${T.wd ? ' · excl. investment withdrawals' : ''}</div></div>
+    <div class="stat"><div class="label"><span class="dot" style="background:var(--s-in)"></span>Money in</div><div class="value">${money(T.inc)}</div><div class="note">${(n => n + (n === 1 ? ' credit' : ' credits'))(list.filter(t => kindOf(t) === 'income').length)}${MS() === 1 && (list.some(shifted) || (S.month !== 'all' && S.txns.some(t => t.date.startsWith(S.month) && pkey(t) !== S.month && catOf(t) === 'Salary'))) ? ' · salary counted for the month earned' : ''}${T.wd ? ' · excl. investment withdrawals' : ''}</div></div>
     <div class="stat"><div class="label"><span class="dot" style="background:var(--s-out)"></span>Spent</div><div class="value">${money(T.spent)}</div><div class="note">${T.off ? `after ${money(T.off)} refunded / reimbursed` : (nMonths > 1 ? money(T.spent / nMonths) + ' / month avg' : (n => n + (n === 1 ? ' payment' : ' payments'))(list.filter(t => kindOf(t) === 'expense').length))}</div></div>
     <div class="stat"><div class="label">📈 Invested</div><div class="value">${money(T.inv)}</div><div class="note">${T.wd ? `📤 ${money(T.wd)} withdrawn` + (T.inv ? ` · net ${T.inv - T.wd < 0 ? '−' : ''}${money(Math.abs(T.inv - T.wd))}` : '') : 'SIPs, stocks, deposits'}</div></div>${T.big > 0 ? `
     <div class="stat"><div class="label">🚗 Big purchases</div><div class="value">${money(T.big)}</div><div class="note">One-time, not in Spent</div></div>` : ''}
@@ -1375,6 +1450,7 @@ function render(){
   renderReview(list);
   renderNag();
   renderHealth(list, T);
+  renderBudgets();
   renderCats(list, T);
   renderInsights(list, T);
   renderMerchants(list);
@@ -1665,7 +1741,7 @@ function renderRows(list){
   $('rows').innerHTML = rows.slice(0, S.limit).map(t => {
     const c = catOf(t);
     return `<tr><td class="date">${new Date(t.date).toLocaleDateString('en-IN', {day: 'numeric', month: 'short'})}<div class="yr">${t.date.slice(0, 4)}</div></td>
-      <td class="desc"><div class="mn">${esc(t.merchant)}${pkey(t) !== t.date.slice(0, 7) ? ` <span class="shift" data-tip="Salary paid in the first week of a month is counted for the previous month (the month it was earned).">counted for ${monthLabel(pkey(t), true)}</span>` : ''}</div><div class="raw" title="${esc(t.desc)}">${esc(t.desc)}</div></td>
+      <td class="desc"><div class="mn">${esc(t.merchant)}${shifted(t) ? ` <span class="shift" data-tip="Salary paid in the first week of a month is counted for the previous month (the month it was earned).">counted for ${monthLabel(pkey(t), true)}</span>` : ''}</div><div class="raw" title="${esc(t.desc)}">${esc(t.desc)}</div></td>
       <td class="catc"><select class="cat" data-id="${t.id}">${opts(c, t.amount)}</select></td>
       <td class="amt ${t.amount > 0 ? 'in' : ''}">${t.amount > 0 ? '+' : '−'}${fmt2.format(Math.abs(t.amount))}</td></tr>`;
   }).join('') || `<tr><td class="hint">No matching transactions.</td></tr>`;
@@ -1789,29 +1865,9 @@ function renderTrends(){
 
 /* ---------- recurring payments ---------- */
 function renderRecurring(){
-  const g = {};
-  for(const t of S.txns){
-    if(t.amount >= 0 || kindOf(t) === 'neutral' || mkey(t) === 'atm cash' || mkey(t) === 'unknown') continue;
-    const k = mkey(t); (g[k] = g[k] || {name: t.merchant, list: []}).list.push(t);
-  }
-  const lastMonth = allMonths().slice(-1)[0];
-  const out = [];
-  for(const r of Object.values(g)){
-    const byM = {}; r.list.forEach(t => { const m = t.date.slice(0, 7); byM[m] = (byM[m] || 0) - t.amount; });
-    const ms = Object.keys(byM).sort(); if(ms.length < 3) continue;
-    const vals = ms.map(m => byM[m]), mean = vals.reduce((a, b) => a + b, 0) / vals.length;
-    const sd = Math.sqrt(vals.reduce((a, v) => a + (v - mean) ** 2, 0) / vals.length);
-    const perMonthCount = r.list.length / ms.length;
-    if(sd / mean > 0.2 || perMonthCount > 1.5) continue;           // must be steady and roughly once a month
-    // span must be mostly consecutive months
-    const idx = m => { const [y, mm] = m.split('-').map(Number); return y * 12 + mm; };
-    let run = 1, best = 1; for(let i = 1; i < ms.length; i++){ run = idx(ms[i]) - idx(ms[i - 1]) === 1 ? run + 1 : 1; best = Math.max(best, run); }
-    if(best < 3) continue;   // needs at least 3 months in a row
-    const last = r.list.map(t => t.date).sort().pop();
-    const lm = lastMonth ? idx(lastMonth) : 0;
-    out.push({name: r.name, cat: catOf(r.list[0]), mean, months: ms.length, last, active: lm - idx(last.slice(0, 7)) <= 1});
-  }
-  out.sort((a, b) => b.mean - a.mean);
+  const R = recurringList(), out = R.list;
+  renderUpcoming(R);
+
   const totalM = out.filter(x => x.active).reduce((a, x) => a + x.mean, 0);
   $('recCard').classList.toggle('hidden', !out.length);
   if(!out.length) return;
@@ -1821,6 +1877,170 @@ function renderRecurring(){
       <div class="amt">${money(x.mean)}<span class="meta">/mo</span></div><div class="yr">${money(x.mean * 12)} a year</div></div>`).join('');
 }
 
+
+
+/* ---------- budgets (with rollover) ---------- */
+const BUDGETABLE = () => CATS.filter(c => c.k === 'expense' || c.k === 'invest' || c.k === 'big');
+function spentIn(cat, m){
+  let s = 0;
+  for(const t of S.txns) if(t.amount < 0 && pkey(t) === m && catOf(t) === cat && kindOf(t) !== 'neutral') s -= t.amount;
+  return s;
+}
+function budgetMonth(){
+  if(S.month !== 'all') return S.month;
+  const ms = allMonths().filter(m => S.year === 'all' || m.startsWith(S.year));
+  return ms[ms.length - 1];
+}
+function carryFor(cat, m){
+  const b = S.budgets[cat]; if(!b || !b.roll) return 0;
+  let c = 0;
+  for(const mm of allMonths()) if(mm >= (b.since || mm) && mm < m) c += b.amt - spentIn(cat, mm);
+  return c;
+}
+function spendMonths(){   // months with real spending in them (not just a salary credit), excluding the month still in progress
+  const cur = cycleOf(new Date().toISOString().slice(0, 10)), cnt = {};
+  for(const t of S.txns) if(t.amount < 0) cnt[pkey(t)] = (cnt[pkey(t)] || 0) + 1;
+  return Object.keys(cnt).filter(m => cnt[m] >= 5 && m !== cur).sort();
+}
+function avgSpend(cat){
+  const recent = spendMonths().slice(-3);
+  return recent.reduce((a, m) => a + spentIn(cat, m), 0) / (recent.length || 1);
+}
+function renderBudgets(){
+  const m = budgetMonth(), cats = Object.keys(S.budgets || {}).filter(c => CAT_BY_NAME[c]);
+  $('bgTitle').textContent = m ? `Budgets · ${monthLabel(m)}` : 'Budgets';
+  if(!m){ $('budgets').innerHTML = ''; return; }
+  // is this month still in progress? then show where you "should" be today
+  const now = new Date(), todayKey = cycleOf(now.toISOString().slice(0, 10));
+  let pace = null;
+  if(m === todayKey){
+    const D = MS(), start = D > 15 && D > 1 ? prevMonth(m) : m, [y, mo] = start.split('-').map(Number);
+    const s = new Date(y, mo - 1, D), e = new Date(y, mo, D); pace = Math.min(1, Math.max(0, (now - s) / (e - s)));
+  }
+  $('bgSub').textContent = pace != null ? `This month so far · ${Math.round(pace * 100)}% of the month gone (the line on each bar).` : (S.month === 'all' ? 'Showing your latest month. Pick a month above to see another.' : 'Monthly limits per category.');
+  if(!cats.length){
+    $('budgets').innerHTML = `<div class="hint" style="line-height:1.5">No budgets yet. Tap <b>Set budgets</b>: the app suggests a limit for each category from what you usually spend, and you adjust from there.</div>`;
+    return;
+  }
+  let tb = 0, ts = 0;
+  const rows = cats.map(c => {
+    const b = S.budgets[c], spent = spentIn(c, m), carry = carryFor(c, m), avail = b.amt + carry;
+    tb += avail; ts += spent;
+    return {c, b, spent, carry, avail, ratio: avail > 0 ? spent / avail : (spent > 0 ? 2 : 0)};
+  }).sort((a, b) => b.ratio - a.ratio);
+  const bar = r => {
+    const left = r.avail - r.spent, exact = r.avail > 0 && Math.abs(left) <= Math.max(1, r.avail * 0.005);
+    const over = !exact && r.spent > r.avail, warn = !over && !exact && r.ratio >= 0.8;
+    const col = over ? 'var(--bad)' : warn ? 'var(--warn)' : exact ? 'var(--good)' : 'var(--accent)';
+    const status = exact ? `✓ On budget` : over ? `🔻 <b style="color:var(--bad)">${money(-left)} over</b>` : warn ? `⚠️ <b>${money(left)} left</b>` : `${money(left)} left`;
+    const ahead = pace != null && !over && r.ratio > pace + 0.15 ? ' · spending faster than the month' : '';
+    return `<div class="bg" data-tip="<b>${esc(r.c)}</b><br>Budget ${money(r.b.amt)}${r.carry ? `<br>Rolled over: ${r.carry < 0 ? '−' : '+'}${money(Math.abs(r.carry))}` : ''}<br>Spent ${money(r.spent)}">
+      <div class="top"><span>${(CAT_BY_NAME[r.c] || {e: ''}).e}</span><span class="nm">${esc(r.c)}</span><span class="v">${money(r.spent)} of ${money(r.avail)}</span></div>
+      <div class="track"><i style="width:${Math.min(100, r.ratio * 100)}%;background:${col}"></i>${pace != null ? `<b style="left:${pace * 100}%"></b>` : ''}</div>
+      <div class="st"><span>${status}${ahead}</span>${r.carry ? `<span>${r.carry > 0 ? '↪ includes' : '↪ minus'} ${money(Math.abs(r.carry))} rolled over</span>` : ''}</div></div>`;
+  };
+  const nOver = rows.filter(r => r.spent > r.avail + Math.max(1, r.avail * 0.005)).length;
+  const shown = S.bgAll ? rows : rows.slice(0, 6);
+  $('budgets').innerHTML = `<div class="rvsum" style="margin-top:0"><span class="big">${money(Math.max(0, tb - ts))}</span> left of ${money(tb)} budgeted${nOver ? ` · <b style="color:var(--bad)">${nOver} over budget</b>` : ''}</div>` + shown.map(bar).join('') +
+    (rows.length > 6 ? `<div class="more" style="margin-top:8px"><button class="btn ghost" id="bgMore" style="font-size:13px">${S.bgAll ? 'Show fewer' : `Show all ${rows.length} budgets`}</button></div>` : '');
+}
+function openBudgets(){
+  S.budgets = S.budgets || {};
+  const cats = BUDGETABLE().map(c => ({c, avg: avgSpend(c.n), b: S.budgets[c.n]}))
+    .filter(x => x.avg > 0 || x.b).sort((a, b) => b.avg - a.avg);
+  const rest = BUDGETABLE().filter(c => !cats.some(x => x.c === c));
+  const row = x => `<div class="bgrow"><span>${x.c.e}</span><div><div>${esc(x.c.n)}</div><div class="avg">${x.avg ? `usually ${money(x.avg)} a month` : 'no recent spending'}</div></div>
+    <input type="number" inputmode="numeric" min="0" step="100" data-bcat="${esc(x.c.n)}" data-avg="${Math.round(x.avg)}" value="${x.b ? x.b.amt : ''}" placeholder="No budget" aria-label="Budget for ${esc(x.c.n)}">
+    <label><input type="checkbox" data-broll="${esc(x.c.n)}" ${x.b && x.b.roll ? 'checked' : ''}> Roll over</label></div>`;
+  $('bsList').innerHTML = cats.map(row).join('') + (rest.length ? `<details style="margin-top:10px"><summary class="hint" style="cursor:pointer">More categories (${rest.length})</summary>${rest.map(c => row({c, avg: 0, b: S.budgets[c.n]})).join('')}</details>` : '');
+  $('bsheet').classList.remove('hidden');
+}
+const closeBudgets = () => $('bsheet').classList.add('hidden');
+$('btnBudgets').onclick = openBudgets;
+document.addEventListener('click', e => { if(e.target.id === 'bgMore'){ S.bgAll = !S.bgAll; renderBudgets(); } }); $('bsClose').onclick = closeBudgets; $('bsCancel').onclick = closeBudgets;
+$('bsheet').addEventListener('click', e => { if(e.target.id === 'bsheet') closeBudgets(); });
+$('bsAvg').onclick = () => document.querySelectorAll('#bsList input[data-bcat]').forEach(i => { if(!i.value && +i.dataset.avg > 0) i.value = Math.max(500, Math.round(+i.dataset.avg / 500) * 500); });
+$('bsSave').onclick = () => {
+  const nb = {}, m = budgetMonth() || allMonths().slice(-1)[0];
+  document.querySelectorAll('#bsList input[data-bcat]').forEach(i => {
+    const c = i.dataset.bcat, v = Math.round(+i.value);
+    const roll = document.querySelector(`#bsList input[data-broll="${CSS.escape(c)}"]`).checked;
+    if(v > 0){ const old = S.budgets[c]; nb[c] = {amt: v, roll, since: old && old.roll === roll && old.since ? old.since : m}; }
+  });
+  S.budgets = nb; save(); closeBudgets(); render();
+  const n = Object.keys(nb).length; toast(n ? `${n} budget${n === 1 ? '' : 's'} saved` : 'Budgets cleared');
+};
+
+/* ---------- upcoming bills ---------- */
+function recurringList(){
+  const g = {};
+  for(const t of S.txns){
+    if(t.amount >= 0 || kindOf(t) === 'neutral' || mkey(t) === 'atm cash' || mkey(t) === 'unknown') continue;
+    const k = mkey(t); (g[k] = g[k] || {name: t.merchant, list: []}).list.push(t);
+  }
+  const lastDate = S.txns.reduce((a, t) => t.date > a ? t.date : a, '');
+  const idx = m => { const [y, mm] = m.split('-').map(Number); return y * 12 + mm; };
+  const lm = lastDate ? idx(lastDate.slice(0, 7)) : 0;
+  const out = [];
+  for(const r of Object.values(g)){
+    const byM = {}; r.list.forEach(t => { const m = t.date.slice(0, 7); byM[m] = (byM[m] || 0) - t.amount; });
+    const ms = Object.keys(byM).sort(); if(ms.length < 3) continue;
+    const vals = ms.map(m => byM[m]), mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const sd = Math.sqrt(vals.reduce((a, v) => a + (v - mean) ** 2, 0) / vals.length);
+    if(sd / mean > 0.2 || r.list.length / ms.length > 1.5) continue;     // steady, roughly once a month
+    let run = 1, best = 1; for(let i = 1; i < ms.length; i++){ run = idx(ms[i]) - idx(ms[i - 1]) === 1 ? run + 1 : 1; best = Math.max(best, run); }
+    if(best < 3) continue;                                                // at least 3 months in a row
+    const days = r.list.map(t => +t.date.slice(8, 10)).sort((a, b) => a - b), day = days[Math.floor(days.length / 2)];
+    const last = r.list.map(t => t.date).sort().pop();
+    out.push({name: r.name, cat: catOf(r.list[0]), mean, months: ms.length, last, day, active: lm - idx(last.slice(0, 7)) <= 1});
+  }
+  return {list: out.sort((a, b) => b.mean - a.mean), lastDate};
+}
+function renderUpcoming(R){
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const horizon = new Date(now); horizon.setDate(horizon.getDate() + 30);
+  const dim = (y, m) => new Date(y, m + 1, 0).getDate();
+  const items = [];
+  for(const x of R.list.filter(x => x.active)){
+    let [y, m] = x.last.slice(0, 7).split('-').map(Number); m--;            // JS month of last payment
+    let d;
+    for(let i = 0; i < 40; i++){                                          // next expected date from today onwards
+      m++; if(m > 11){ m = 0; y++; }
+      d = new Date(y, m, Math.min(x.day, dim(y, m)));
+      if(d >= now) break;
+    }
+    if(d <= horizon) items.push({...x, due: d});
+  }
+  items.sort((a, b) => a.due - b.due);
+  const total = items.reduce((a, x) => a + x.mean, 0);
+  const staleDays = R.lastDate ? Math.round((now - new Date(R.lastDate)) / 864e5) : 0;
+  $('upSub').textContent = `Regular payments expected in the next 30 days, based on your statements up to ${R.lastDate ? new Date(R.lastDate).toLocaleDateString('en-IN', {day: 'numeric', month: 'short', year: 'numeric'}) : '—'}.`;
+  const inClaude = !!(window.claude && claude.use);
+  $('upcoming').innerHTML = (staleDays > 35 ? `<div class="hint" style="margin-bottom:8px">ℹ️ Your latest statement is ${staleDays} days old, so some of these may already be paid. Add your newest statement for an accurate list.</div>` : '') +
+    (items.length ? `<div class="rvsum" style="margin-top:0"><span class="big">${money(total)}</span> due in the next 30 days · ${items.length} payment${items.length === 1 ? '' : 's'}</div>` +
+      items.map(x => `<div class="up"><div class="d"><b>${x.due.getDate()}</b><span>${x.due.toLocaleDateString('en-IN', {month: 'short'})}</span></div>
+        <div><div>${(CAT_BY_NAME[x.cat] || {e: ''}).e} ${esc(x.name)}</div><div class="meta">${esc(x.cat)} · ${x.due.toLocaleDateString('en-IN', {weekday: 'long'})} · usually around the ${ordinal(x.day)}</div></div>
+        <div class="amt">~${money(x.mean)}</div></div>`).join('')
+      : `<div class="hint">No regular payments expected in the next 30 days. Payments show up here once they've repeated for 3 months in a row.</div>`) +
+    (!inClaude && R.list.some(x => x.active) ? `<div class="row2" style="margin-top:10px"><button class="btn" id="btnIcs">📅 Add reminders to my calendar</button></div><div class="hint" style="margin-top:4px">Adds a monthly reminder the day before each payment, plus one on the 3rd to add your new statement.</div>` : '');
+}
+function icsFile(R){
+  const pad = n => String(n).padStart(2, '0'), now = new Date();
+  const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+  const ymd = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+  const clean = s => String(s).replace(/[,;\\]/g, ' ').replace(/\n/g, ' ');
+  const ev = (uid, day, summary, desc) => {
+    const start = new Date(now.getFullYear(), now.getMonth(), Math.min(day, 28)); if(start < now) start.setMonth(start.getMonth() + 1);
+    return ['BEGIN:VEVENT', `UID:${uid}@money-map`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${ymd(start)}`, `RRULE:FREQ=MONTHLY;BYMONTHDAY=${Math.min(day, 28)}`,
+      `SUMMARY:${clean(summary)}`, `DESCRIPTION:${clean(desc)}`, 'BEGIN:VALARM', 'TRIGGER:-P1D', 'ACTION:DISPLAY', `DESCRIPTION:${clean(summary)}`, 'END:VALARM', 'END:VEVENT'];
+  };
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Money Map//EN', 'CALSCALE:GREGORIAN'];
+  R.list.filter(x => x.active).forEach((x, i) => lines.push(...ev(`bill-${i}-${x.name.replace(/\W+/g, '')}`, x.day, `${x.name}: about ${money(x.mean)}`, `${x.cat}. Usual monthly payment, from Money Map.`)));
+  lines.push(...ev('statement-reminder', 3, 'Add your bank statement to Money Map', 'Download last month’s statement from net banking and add it to Money Map.'));
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n');
+}
+document.addEventListener('click', e => { if(e.target.id === 'btnIcs'){ offerFile('money-map-reminders.ics', new Blob([icsFile(recurringList())], {type: 'text/calendar'})); } });
 
 /* ---------- custom categories ---------- */
 function applyCustomCats(){
@@ -1927,6 +2147,9 @@ $('btnExportX').onclick = async () => {
 async function renderSettings(){
   $('backupInfo').textContent = S.lastBackup ? `Last backup: ${new Date(S.lastBackup).toLocaleDateString('en-IN', {day: 'numeric', month: 'short', year: 'numeric'})}` : 'No backup yet.';
   renderCustomList();
+  $('msSel').innerHTML = Array.from({length: 28}, (_, i) => i + 1).map(d => `<option value="${d}" ${d === MS() ? 'selected' : ''}>${d === 1 ? '1st (calendar month)' : ordinal(d)}</option>`).join('');
+  const sug = suggestMonthStart();
+  $('msSuggest').innerHTML = sug && MS() === 1 ? `💡 Your salary usually arrives around the end of the month. Starting months on the <b>${ordinal(sug)}</b> keeps each salary with the month it pays for. <button class="btn" id="msUse" style="margin-left:6px;font-size:13px;padding:5px 10px">Use the ${ordinal(sug)}</button>` : '';
   let est = '';
   try{ if(navigator.storage && navigator.storage.estimate){ const e = await navigator.storage.estimate(); est = ` · using ${(e.usage / 1048576).toFixed(1)} MB of ${(e.quota / 1073741824).toFixed(1)} GB available`; } }catch(e){}
   $('storeInfo').textContent = `${S.txns.length} transactions saved ${storageMode === 'idb' ? 'in this browser’s database' : 'in basic browser storage'}${est}.`;
@@ -1934,6 +2157,12 @@ async function renderSettings(){
 function openSettings(){ renderSettings(); $('settings').classList.remove('hidden'); $('setClose').focus(); }
 function closeSettings(){ $('settings').classList.add('hidden'); }
 $('btnSettings').onclick = openSettings;
+function setMonthStart(d){
+  S.monthStart = d; S.month = 'all'; save(); render(); renderSettings();
+  toast(d === 1 ? 'Months now follow the calendar (1st to end of month).' : `Months now run from the ${ordinal(d)} to the ${ordinal(d - 1)}.`);
+}
+$('msSel').onchange = e => setMonthStart(+e.target.value);
+document.addEventListener('click', e => { if(e.target.id === 'msUse') setMonthStart(suggestMonthStart()); });
 $('btnClear2').onclick = () => { closeSettings(); $('btnClear').click(); }; $('setClose').onclick = closeSettings;
 $('settings').addEventListener('click', e => { if(e.target.id === 'settings') closeSettings(); });
 document.addEventListener('keydown', e => { if(e.key === 'Escape' && !$('settings').classList.contains('hidden')) closeSettings(); });
@@ -2003,7 +2232,7 @@ $('btnClear').onclick = () => {
     <button class="btn ghost" id="clrNo">Cancel</button></div>`);
   $('clrNo').onclick = () => showStatus('');
   $('clrTx').onclick = () => { S.txns = []; S.cat = null; S.payee = null; S.year = 'all'; S.month = 'all'; save(); showStatus(''); render(); toast('Transactions cleared — your category choices are kept'); };
-  $('clrAll').onclick = () => { S = {txns: [], rules: {}, reviewed: {}, overrides: {}, year: 'all', month: 'all', cat: null, q: '', limit: 60}; save(); showStatus(''); render(); toast('Everything cleared'); };
+  $('clrAll').onclick = () => { S = {txns: [], rules: {}, reviewed: {}, overrides: {}, budgets: {}, monthStart: 1, year: 'all', month: 'all', cat: null, q: '', limit: 60}; save(); showStatus(''); render(); toast('Everything cleared'); };
 };
 const drop = $('drop');
 ['dragenter', 'dragover'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
@@ -2090,13 +2319,13 @@ document.addEventListener('click', e => {
   if(e.target.id !== 'btnDelPeriod') return;
   const pk = periodKey(); if(!pk) return;
   const name = pk.length === 4 ? `all of ${pk}` : monthLabel(pk);
-  const n = S.txns.filter(t => t.date.startsWith(pk)).length;
+  const n = S.txns.filter(t => inDelPeriod(t, pk)).length;
   showStatus(`<b>Delete ${esc(name)}?</b>
-    <div class="hint" style="margin:4px 0 10px">This removes the ${n} transaction${n === 1 ? '' : 's'} dated in ${esc(name)} (by the date on your bank statement). Your category choices are kept, so if you upload that statement again it’s sorted the same way.</div>
+    <div class="hint" style="margin:4px 0 10px">This removes the ${n} transaction${n === 1 ? '' : 's'} ${MS() > 1 && pk.length > 4 ? `from ${esc(cycleRange(pk))}` : `dated in ${esc(name)} (by the date on your bank statement)`}. Your category choices are kept, so if you upload that statement again it’s sorted the same way.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn danger" id="delYes">Delete ${esc(name)}</button><button class="btn ghost" id="delNo">Cancel</button></div>`, 'err');
   $('delNo').onclick = () => showStatus('');
   $('delYes').onclick = () => {
-    S.txns = S.txns.filter(t => !t.date.startsWith(pk));
+    S.txns = S.txns.filter(t => !inDelPeriod(t, pk));
     if(pk.length === 4){ S.year = 'all'; S.month = 'all'; } else S.month = 'all';
     S.payee = null; save(); showStatus(''); render(); toast(`Deleted ${n} transactions from ${name}`);
   };

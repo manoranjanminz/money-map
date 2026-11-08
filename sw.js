@@ -1,5 +1,5 @@
 /* Money Map service worker: works offline, and receives statements shared from other apps (Android). */
-const VERSION = 'mm-v1';
+const VERSION = 'mm-v2';
 const SHARE = 'mm-share';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/favicon-32.png'];
 // libraries the app loads on demand (Excel + PDF readers) and fonts: cached the first time they're used
