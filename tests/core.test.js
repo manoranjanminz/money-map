@@ -69,3 +69,21 @@ test('dates in Indian formats', () => {
   assert.strictEqual(c.parseDate('2026-10-01'), '2026-10-01');
   assert.strictEqual(c.parseDate(46296), '2026-10-01');
 });
+
+test('running balance is kept from Excel and PDF statements', () => {
+  const rows = [['Txn Date', 'Value Date', 'Description', 'Ref No./Cheque No.', 'Debit', 'Credit', 'Balance'],
+    ['1 Oct 2026', '1 Oct 2026', 'WDL TFR UPI/DR/1/SWIGGY', '', '420.00', '', '9,580.00']];
+  assert.strictEqual(c.rowsToTxns(rows).txns[0].bal, 9580);
+  const r = c.linesToTxns(require('./fixtures/sbi_pdf_lines.json'));
+  assert.ok(r.txns.every(t => typeof t.bal === 'number'));
+  assert.strictEqual(r.txns[0].bal, 139000);
+});
+
+test('credit card statements: recognised, purchases negative, payments positive', () => {
+  const csv = `HDFC Bank Credit Card Statement\nCard No: XXXX XXXX XXXX 1234\nTotal Amount Due,12000\nDate,Transaction Details,Amount\n05/10/2026,SWIGGY BANGALORE,450.00\n12/10/2026,PAYMENT RECEIVED - THANK YOU,5000.00 Cr\n15/10/2026,AMAZON PAY INDIA,1299.00 Dr`;
+  const r = c.rowsToTxns(c.parseCSV(csv));
+  assert.strictEqual(r.card, true);
+  assert.deepStrictEqual(r.txns.map(t => t.amount), [-450, 5000, -1299]);
+  assert.deepStrictEqual(c.rowsToTxns(c.parseCSV(`Credit Card Statement\nPayment Due Date,25 Oct 2026\nDate,Details,Amount\n05/10/2026,SWIGGY,450.00\n12/10/2026,PAYMENT RECEIVED,-5000.00`)).txns.map(t => t.amount), [-450, 5000]);
+  assert.strictEqual(c.rowsToTxns(c.parseCSV('Date,Narration,Withdrawal Amt.,Deposit Amt.\n01/10/26,UPI-SWIGGY,100.00,')).card, undefined);
+});

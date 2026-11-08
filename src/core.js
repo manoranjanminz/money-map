@@ -186,6 +186,7 @@ function mapColumns(header){
   col.amount = pick(c => H.amount.test(c));
   return col;
 }
+const CARD_RE = /credit card|card ?(no|number)\b|card account|minimum (amount )?due|total (amount )?due|payment due date|credit limit/i;
 function rowsToTxns(rows){
   const h = findHeader(rows);
   if(h < 0) return {txns: [], error: "Couldn't find the transaction table (looked for Date, Description and Amount columns)."};
@@ -202,6 +203,7 @@ function rowsToTxns(rows){
     }
   }
   const col = mapColumns(rows[h]);
+  const isCard = rows.slice(0, h).some(r => CARD_RE.test(r.join(' ')));   // credit card statement: unsigned amounts are purchases
   if(col.date < 0 || col.desc < 0 || (col.debit < 0 && col.credit < 0 && col.amount < 0))
     return {txns: [], error: 'Found a table, but could not tell which columns hold the amounts.'};
   const txns = [];
@@ -226,6 +228,8 @@ function rowsToTxns(rows){
       if(a && a.value){
         let sign = a.sign;
         if(col.type >= 0){ const t = hnorm(r[col.type]); if(/^(dr|d|debit|withdrawal)/.test(t)) sign = -1; else if(/^(cr|c|credit|deposit)/.test(t)) sign = 1; }
+        // card statements: purchases are plain or marked Dr; payments and refunds are marked Cr or shown as negative
+        if(isCard && col.type < 0){ const raw = String(r[col.amount]).trim(); sign = /\bcr\.?\s*$/i.test(raw) || /^-|^\(/.test(raw) || (typeof r[col.amount] === 'number' && r[col.amount] < 0) ? 1 : -1; }
         amount = sign < 0 ? -a.value : a.value;
       }
     }
@@ -236,10 +240,13 @@ function rowsToTxns(rows){
     if(ref && /[a-z]{3,}/i.test(ref) && !/[\/*@]/.test(desc) && desc.replace(/\b(dep|wdl|tfr|trf|to|by|transfer|csh|cash)\b/gi, '').trim().length < 4) desc = (desc + ' ' + ref).trim();
     desc = desc || '(no description)';
     if(/^(opening|closing) balance/i.test(desc)) continue;
-    txns.push({date, desc, amount: Math.round(amount * 100) / 100});
+    const b = col.balance >= 0 ? parseAmount(r[col.balance]) : null;
+    const tx = {date, desc, amount: Math.round(amount * 100) / 100};
+    if(b) tx.bal = b.sign < 0 ? -b.value : b.value;   // running balance, when the statement has it
+    txns.push(tx);
   }
   if(!txns.length) return {txns, error: 'Found the table, but no transactions with valid dates and amounts.'};
-  return {txns, holder};
+  return isCard ? {txns, holder, card: true} : {txns, holder};
 }
 
 /* ---------- PDF text lines → transactions (best effort) ---------- */
@@ -390,6 +397,12 @@ function smartJoin(pieces){
 const ROW_START = /^\d{1,2}(?:[\s\/\-.]+(?:\d{1,2}|[A-Za-z]{3,9})|[A-Za-z]{3,9})/;
 const FOOTER = /page\s*\d|page no|computer generated|does not require|signature|closing balance|opening balance|statement summary|total|carried forward|brought forward|b\/f|c\/f|customer care|toll free|please|disclaimer|registered office|www\.|\.com\b|gstin|ifsc|micr|branch/i;
 function linesToTxns(lines){
+  const isCard = lines.slice(0, 40).some(l => CARD_RE.test(l.items.map(i => i.str).join(' ')));
+  const r = linesToTxnsInner(lines);
+  if(isCard && r.txns.length) r.card = true;
+  return r;
+}
+function linesToTxnsInner(lines){
   let cols = null, cur = null, opening = null;
   const raw = [];
   const finish = () => { if(cur){ raw.push(cur); cur = null; } };
@@ -491,7 +504,7 @@ function linesToTxns(lines){
   }
   // first row has no previous balance: if the whole statement had its columns swapped, flip it too
   if(disagree > agree * 2 && disagree >= 3 && seq[0] && opening == null) seq[0].amount = -seq[0].amount;
-  txns.forEach(t => { delete t.bal; if(!t.alt) delete t.alt; });
+  txns.forEach(t => { if(t.bal == null) delete t.bal; if(!t.alt) delete t.alt; });
   if(txns.length) return {txns};
   return linesToTxnsLoose(lines);
 }
