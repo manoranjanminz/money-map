@@ -1260,7 +1260,7 @@ const IDB = (() => {
   const tx = (mode, fn) => open().then(db => new Promise((res, rej) => { const t = db.transaction('kv', mode); const st = t.objectStore('kv'); const out = fn(st); t.oncomplete = () => res(out && out.result); t.onerror = () => rej(t.error); }));
   return {get: k => tx('readonly', st => st.get(k)), set: (k, v) => tx('readwrite', st => st.put(v, k)), del: k => tx('readwrite', st => st.delete(k))};
 })();
-const KEEP = ['alt', 'override', 'note', 'tags', 'photo', 'split', 'cash', 'manual', 'payee', 'src', 'bal'];
+const KEEP = ['alt', 'override', 'note', 'tags', 'photo', 'split', 'cash', 'manual', 'payee', 'src', 'bal', 'pshift'];
 function keepFields(f, t){ for(const k of KEEP) if(t[k] != null) f[k] = t[k]; return f; }
 function snapshot(){
   return {v: 2, savedAt: new Date().toISOString(),
@@ -1539,7 +1539,7 @@ function monthLabel(ym, short){ const [y, m] = ym.split('-').map(Number); return
 function periodKey(){ return S.month !== 'all' ? S.month : S.year !== 'all' ? S.year : null; }
 // Salary credited in the first week of a month is for the previous month's work, so it's counted there.
 // This stops a month from showing two salaries (one early, one late) and the next month none.
-const SAL_EARLY_DAY = 7;
+const SAL_EARLY_DAY = 10, SAL_LATE_DAY = 20;   // salary paid between the 20th and the 10th of next month belongs to the month it was earned
 function prevMonth(ym){ let [y, m] = ym.split('-').map(Number); m--; if(!m){ m = 12; y--; } return `${y}-${String(m).padStart(2, '0')}`; }
 function nextMonth(ym){ let [y, m] = ym.split('-').map(Number); m++; if(m > 12){ m = 1; y++; } return `${y}-${String(m).padStart(2, '0')}`; }
 // Month cycles: with a start day D > 1 (e.g. 25), 25 Oct – 24 Nov is one "month". It's named after the month most of it falls in.
@@ -1555,13 +1555,21 @@ function cycleRange(label){
   const f = (ym, d, yr) => { const [y, m] = ym.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-IN', {day: 'numeric', month: 'short', ...(yr ? {year: 'numeric'} : {})}); };
   return `${f(start, D)} – ${f(end, D - 1, true)}`;
 }
-function pkey(t){
-  if(MS() > 1) return cycleOf(t.date);
-  const ym = t.date.slice(0, 7); return (t.amount > 0 && +t.date.slice(8, 10) <= SAL_EARLY_DAY && catOf(t) === 'Salary') ? prevMonth(ym) : ym;
+// the month a salary credit was earned: paid early (from the 20th) or late (up to the 10th of next month), it still belongs to the work month
+function workMonth(t){ const ym = t.date.slice(0, 7), d = +t.date.slice(8, 10); return d <= SAL_EARLY_DAY ? prevMonth(ym) : ym; }
+const isSal = t => t.amount > 0 && catOf(t) === 'Salary';
+function basePkey(t){
+  const D = MS();
+  if(D === 1) return isSal(t) ? workMonth(t) : t.date.slice(0, 7);
+  // payday cycles that start near month-end or month-start: a salary funds the cycle right after the month it was earned,
+  // whether it arrives a few days early or late
+  if(isSal(t) && (D >= SAL_LATE_DAY || D <= SAL_EARLY_DAY)){ const d = +t.date.slice(8, 10); if(d >= SAL_LATE_DAY || d <= SAL_EARLY_DAY) return nextMonth(workMonth(t)); }
+  return cycleOf(t.date);
 }
+function pkey(t){ const k = basePkey(t); return t.pshift ? (t.pshift < 0 ? prevMonth(k) : nextMonth(k)) : k; }
 const inDelPeriod = (t, pk) => MS() > 1 && pk.length > 4 ? pkey(t) === pk : t.date.startsWith(pk);
 const ordinal = n => n + (n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th');
-const shifted = t => MS() === 1 && pkey(t) !== t.date.slice(0, 7);
+const shifted = t => pkey(t) !== (MS() === 1 ? t.date.slice(0, 7) : cycleOf(t.date));
 function suggestMonthStart(){
   const days = S.txns.filter(t => t.amount > 0 && catOf(t) === 'Salary').map(t => { const d = +t.date.slice(8, 10); return d <= 7 ? d + 31 : d; }).sort((a, b) => a - b);
   if(days.length < 2) return null;
@@ -1938,7 +1946,7 @@ function renderRows(list){
   $('rows').innerHTML = rows.slice(0, S.limit).map(t => {
     const c = catOf(t);
     return `<tr><td class="date">${new Date(t.date).toLocaleDateString('en-IN', {day: 'numeric', month: 'short'})}<div class="yr">${t.date.slice(0, 4)}</div></td>
-      <td class="desc" data-open="${t.id}"><div class="mn">${esc(t.merchant)}${t.note ? '<span class="mark" title="Has a note">📝</span>' : ''}${t.photo ? '<span class="mark" title="Has a receipt">📷</span>' : ''}${t.split ? `<span class="mark">· split, your share ${money(t.split.mine)}</span>` : ''}${t.cash ? '<span class="mark">· cash</span>' : ''}${t.src === 'card' ? '<span class="mark">· 💳 card</span>' : ''}${shifted(t) ? ` <span class="shift" data-tip="Salary paid in the first week of a month is counted for the previous month (the month it was earned).">counted for ${monthLabel(pkey(t), true)}</span>` : ''}</div><div class="raw" title="${esc(t.desc)}">${esc(t.note || t.desc)}</div>${(t.tags || []).map(g => `<span class="tagchip" data-tag="${esc(g)}">#${esc(g)}</span>`).join('')}</td>
+      <td class="desc" data-open="${t.id}"><div class="mn">${esc(t.merchant)}${t.note ? '<span class="mark" title="Has a note">📝</span>' : ''}${t.photo ? '<span class="mark" title="Has a receipt">📷</span>' : ''}${t.split ? `<span class="mark">· split, your share ${money(t.split.mine)}</span>` : ''}${t.cash ? '<span class="mark">· cash</span>' : ''}${t.src === 'card' ? '<span class="mark">· 💳 card</span>' : ''}${shifted(t) ? ` <span class="shift" data-tip="${t.pshift ? 'You moved this payment to another month.' : 'Salary is counted for the month you earned it, even when it is paid a few days early or late. Tap the payment to change this.'}">counted for ${monthLabel(pkey(t), true)}</span>` : ''}</div><div class="raw" title="${esc(t.desc)}">${esc(t.note || t.desc)}</div>${(t.tags || []).map(g => `<span class="tagchip" data-tag="${esc(g)}">#${esc(g)}</span>`).join('')}</td>
       <td class="catc"><select class="cat" data-id="${t.id}">${opts(c, t.amount)}</select></td>
       <td class="amt ${t.amount > 0 ? 'in' : ''}">${t.amount > 0 ? '+' : '−'}${fmt2.format(Math.abs(t.amount))}</td></tr>`;
   }).join('') || `<tr><td class="hint">No matching transactions.</td></tr>`;
@@ -2292,6 +2300,8 @@ function renderTxnSheet(){
     <div class="tsf">
       <label class="lbl2">Category<select class="cat" data-id="${t.id}" style="max-width:none;font-size:14px;padding:8px">${opts}</select></label>
       <div class="lbl2">Not really ${out ? 'spending' : 'income'}? One tap, this payment only:<div class="qa">${quick.map(([n, l]) => `<button class="btn ${n === c ? 'primary' : ''}" data-quick="${esc(n)}">${l}</button>`).join('')}</div></div>
+      ${out ? '' : (() => { const b = basePkey(t), cur = pkey(t); const o = [[-1, prevMonth(b)], [0, b], [1, nextMonth(b)]];
+        return `<label class="lbl2">Counts for month<select id="tsMonth" class="cat" style="max-width:none;font-size:14px;padding:8px">${o.map(([s, k]) => `<option value="${s}" ${k === cur ? 'selected' : ''}>${monthLabel(k)}${s === 0 ? ' (automatic)' : ''}</option>`).join('')}</select><span class="hint" style="font-weight:400">Use this if a salary or other income arrived early or late and belongs to a different month.</span></label>`; })()}
       <label class="lbl2">Note<textarea id="tsNote" placeholder="Add a note…">${esc(t.note || '')}</textarea></label>
       <label class="lbl2">Tags<input id="tsTags" value="${esc((t.tags || []).join(', '))}" placeholder="e.g. goa-trip, wedding, office"></label>
       <div class="lbl2">Receipt or bill photo
@@ -2308,6 +2318,12 @@ function renderTxnSheet(){
   $('tsBody').dataset.id = t.id;
   if(draft){ $('tsNote').value = draft.note; $('tsTags').value = draft.tags; }
 }
+$('tsheet').addEventListener('change', e => {
+  if(e.target.id !== 'tsMonth') return;
+  const t = S.txns.find(x => x.id === openId); if(!t) return;
+  const s = +e.target.value; if(s) t.pshift = s; else delete t.pshift;
+  save(); render(); renderTxnSheet(); toast(`Now counted for ${monthLabel(pkey(t))}`);
+});
 $('tsheet').addEventListener('click', async e => {
   if(e.target.id === 'tsheet' || e.target.id === 'tsClose') return closeTxn();
   const t = S.txns.find(x => x.id === openId); if(!t) return;
@@ -2577,12 +2593,20 @@ function openWrapped(m){
   const bud = Object.keys(S.budgets || {}).filter(c => CAT_BY_NAME[c]), kept = bud.filter(c => spentIn(c, m) <= S.budgets[c].amt + carryFor(c, m) + 1).length;
   const delta = PT.spent ? Math.round((T.spent - PT.spent) / PT.spent * 100) : null;
   const rate = T.inc > 0 ? Math.round((T.inc - T.spent - T.big) / T.inc * 100) : null;
+  const sal = L.filter(isSal).sort((a, b) => a.date.localeCompare(b.date));
+  const dshort = d => new Date(d).toLocaleDateString('en-IN', {day: 'numeric', month: 'short'});
+  const salTxt = sal.length ? `Salary ${money(sal.reduce((a, t) => a + t.amount, 0))}, credited ${sal.map(t => dshort(t.date)).join(' & ')}` : '';
+  const anySal = S.txns.some(isSal);
+  const salWarn = !anySal ? '' : sal.length === 0 ? `⚠️ No salary is counted for ${monthLabel(m)}. If it arrived early or late, open that salary payment and change <b>Counts for month</b>.`
+    : sal.length > 1 && sal.filter(t => t.amount > 0.5 * Math.max(...sal.map(x => x.amount))).length > 1 ? `⚠️ ${sal.length} salary payments are counted for ${monthLabel(m)} (${sal.map(t => dshort(t.date)).join(', ')}). If one belongs to another month, open it and change <b>Counts for month</b>.` : '';
   const ms = allMonths(), i = ms.indexOf(m);
   const card = (k, v, s, cls) => `<div class="wcard ${cls || ''}"><div class="k">${k}</div><div class="v">${v}</div>${s ? `<div class="s">${s}</div>` : ''}</div>`;
   $('wsBody').innerHTML = `<div style="display:flex;align-items:center;gap:8px"><button class="btn ghost" id="wPrev" ${i <= 0 ? 'disabled' : ''} aria-label="Previous month">‹</button><h2 id="wsTitle" style="flex:1;margin:0;font-size:18px;text-align:center">✨ ${monthLabel(m)} in review</h2><button class="btn ghost" id="wNext" ${i >= ms.length - 1 ? 'disabled' : ''} aria-label="Next month">›</button><button class="btn ghost" id="wClose" aria-label="Close">✕</button></div>
     ${card('You spent', money(T.spent), delta == null ? '' : delta === 0 ? 'the same as last month' : `${Math.abs(delta)}% ${delta > 0 ? 'more' : 'less'} than ${monthLabel(prev, true)} ${delta > 0 ? '📈' : '📉'}`, 'hero')}
+    ${salWarn ? `<div class="hint" style="margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--surface-2)">${salWarn} <button class="btn" id="wSal" style="font-size:13px;padding:4px 10px;margin-left:4px">Show salary payments</button></div>` : ''}
     <div class="wgrid" style="margin-top:10px">
-      ${rate != null ? card('Kept', `${rate}%`, 'of what came in') : ''}
+      ${card('Money in', money(T.inc), salTxt || (T.inc ? 'income this month' : 'no income counted'))}
+      ${rate != null ? card('Kept', `${rate}%`, `${money(Math.max(0, T.inc - T.spent - T.big))} of ${money(T.inc)}`) : ''}
       ${sc ? card('Health score', sc.score, psc ? `${sc.score >= psc.score ? '▲' : '▼'} ${Math.abs(sc.score - psc.score)} vs last month` : '') : ''}
       ${cats[0] ? card('Top everyday spend', `${(CAT_BY_NAME[cats[0].n] || {e: ''}).e} ${esc(cats[0].n)}`.replace(/^(.{0,40}).*$/, '$1'), money(cats[0].sum)) : ''}
       ${topM ? card('Favourite place', esc(topM[0]), money(topM[1])) : ''}
@@ -2596,6 +2620,7 @@ function openWrapped(m){
 $('wsheet').addEventListener('click', e => {
   if(e.target.id === 'wsheet' || e.target.id === 'wClose') return $('wsheet').classList.add('hidden');
   const ms = allMonths(), i = ms.indexOf($('wsheet').dataset.m);
+  if(e.target.id === 'wSal'){ $('wsheet').classList.add('hidden'); S.year = 'all'; S.month = 'all'; S.cat = 'Salary'; S.limit = 60; render(); const tc = $('rows'); if(tc) tc.scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
   if(e.target.id === 'wPrev' && i > 0) openWrapped(ms[i - 1]);
   if(e.target.id === 'wNext' && i < ms.length - 1) openWrapped(ms[i + 1]);
 });
