@@ -509,6 +509,11 @@ td.desc{cursor:pointer}
       <p class="hint">If you plan around payday, start each month on that day (e.g. 25th → 25 Oct – 24 Nov counts as November). Totals, budgets, charts and the score all follow it.</p>
       <div class="row2"><label class="hint" for="msSel">Month starts on</label><select id="msSel" class="cat" style="max-width:none"></select></div>
       <div class="hint" id="msSuggest" style="margin-top:8px"></div>
+      <div id="salModeBox" style="margin-top:12px">
+        <div style="font-weight:600;font-size:14px;margin-bottom:4px">Count each salary for…</div>
+        <label class="hint" style="display:flex;gap:8px;align-items:flex-start;margin:6px 0"><input type="radio" name="salMode" value="earned"><span><b>The month I earned it</b> — November's pay counts for November, even if it arrives in early December. Best for seeing how much each month really saved. The current month shows "salary not in yet" until it's paid.</span></label>
+        <label class="hint" style="display:flex;gap:8px;align-items:flex-start;margin:6px 0"><input type="radio" name="salMode" value="spend"><span><b>The month I spend it in</b> — pay that arrives around 1 December funds December. Best for budgeting: each month starts with its money already in.</span></label>
+      </div>
     </section>
     <section>
       <h3>🧭 Your sorting rules</h3>
@@ -1265,7 +1270,7 @@ function keepFields(f, t){ for(const k of KEEP) if(t[k] != null) f[k] = t[k]; re
 function snapshot(){
   return {v: 2, savedAt: new Date().toISOString(),
     txns: S.txns.map(t => { const o = {id: t.id, date: t.date, desc: t.desc, amount: t.amount}; for(const k of KEEP) if(t[k] != null) o[k] = t[k]; return o; }),
-    rules: S.rules, reviewed: S.reviewed, overrides: S.overrides, holder: S.holder || null, customCats: S.customCats || [], lastBackup: S.lastBackup || null, monthStart: S.monthStart || 1, budgets: S.budgets || {}, settled: S.settled || {}, goals: S.goals || [], assets: S.assets || []};
+    rules: S.rules, reviewed: S.reviewed, overrides: S.overrides, holder: S.holder || null, customCats: S.customCats || [], lastBackup: S.lastBackup || null, monthStart: S.monthStart || 1, salMode: S.salMode || 'earned', budgets: S.budgets || {}, settled: S.settled || {}, goals: S.goals || [], assets: S.assets || []};
 }
 let saveT = null, storageMode = 'idb';
 function save(){
@@ -1294,7 +1299,7 @@ function applyData(d){
   try{
     if(d && Array.isArray(d.txns)){
       S.rules = d.rules || {}; S.reviewed = d.reviewed || {}; S.overrides = d.overrides || {}; S.holder = d.holder || null;
-      S.customCats = Array.isArray(d.customCats) ? d.customCats : []; S.lastBackup = d.lastBackup || null; S.monthStart = +d.monthStart || 1; S.budgets = d.budgets || {}; S.settled = d.settled || {}; S.goals = d.goals || []; S.assets = d.assets || []; applyCustomCats();
+      S.customCats = Array.isArray(d.customCats) ? d.customCats : []; S.lastBackup = d.lastBackup || null; S.monthStart = +d.monthStart || 1; S.salMode = d.salMode === 'spend' ? 'spend' : 'earned'; S.budgets = d.budgets || {}; S.settled = d.settled || {}; S.goals = d.goals || []; S.assets = d.assets || []; applyCustomCats();
       (d.txns || []).forEach(t => { if(t.override && t.date && typeof t.amount === 'number') S.overrides[`${t.date}|${t.amount.toFixed(2)}`] = t.override; });
       const RENAMED = {'Health & Fitness': 'Medical', 'Investment Returns': 'Investment Withdrawals'};
       for(const k in S.rules) if(RENAMED[S.rules[k]]) S.rules[k] = RENAMED[S.rules[k]];
@@ -1560,11 +1565,19 @@ function workMonth(t){ const ym = t.date.slice(0, 7), d = +t.date.slice(8, 10); 
 const isSal = t => t.amount > 0 && catOf(t) === 'Salary';
 function basePkey(t){
   const D = MS();
-  if(D === 1) return isSal(t) ? workMonth(t) : t.date.slice(0, 7);
+  if(D === 1) return isSal(t) ? (S.salMode === 'spend' ? nextMonth(workMonth(t)) : workMonth(t)) : t.date.slice(0, 7);
   // payday cycles that start near month-end or month-start: a salary funds the cycle right after the month it was earned,
   // whether it arrives a few days early or late
   if(isSal(t) && (D >= SAL_LATE_DAY || D <= SAL_EARLY_DAY)){ const d = +t.date.slice(8, 10); if(d >= SAL_LATE_DAY || d <= SAL_EARLY_DAY) return nextMonth(workMonth(t)); }
   return cycleOf(t.date);
+}
+// a month whose salary hasn't arrived yet: the latest month, nothing counted as salary, and you normally get one
+function salaryPending(m){
+  if(!m || m.length !== 7 || m !== allMonths().slice(-1)[0]) return null;
+  if(S.txns.some(t => isSal(t) && pkey(t) === m)) return null;
+  const by = {}; S.txns.filter(isSal).forEach(t => { const k = pkey(t); by[k] = (by[k] || 0) + t.amount; });
+  const v = Object.keys(by).sort().slice(-3).map(k => by[k]).sort((a, b) => a - b); if(!v.length) return null;
+  return {usual: v[Math.floor(v.length / 2)]};
 }
 function pkey(t){ const k = basePkey(t); return t.pshift ? (t.pshift < 0 ? prevMonth(k) : nextMonth(k)) : k; }
 const inDelPeriod = (t, pk) => MS() > 1 && pk.length > 4 ? pkey(t) === pk : t.date.startsWith(pk);
@@ -1630,6 +1643,7 @@ function render(){
   $('months').innerHTML = ph;
   const list = inPeriod();
   const T = totals(list);
+  const pend = S.month !== 'all' ? salaryPending(S.month) : null;
   const rate = T.inc > 0 ? Math.round((T.inc - T.spent - T.big) / T.inc * 100) : null;
   const nMonths = S.month !== 'all' ? 1 : S.year !== 'all' ? months.filter(m => m.startsWith(S.year)).length : months.length;
   $('stats').innerHTML = `
@@ -1637,7 +1651,7 @@ function render(){
     <div class="stat"><div class="label"><span class="dot" style="background:var(--s-out)"></span>Spent</div><div class="value">${money(T.spent)}</div><div class="note">${T.off ? `after ${money(T.off)} refunded / reimbursed` : (nMonths > 1 ? money(T.spent / nMonths) + ' / month avg' : (n => n + (n === 1 ? ' payment' : ' payments'))(list.filter(t => kindOf(t) === 'expense').length))}</div></div>
     <div class="stat"><div class="label">📈 Invested</div><div class="value">${money(T.inv)}</div><div class="note">${T.wd ? `📤 ${money(T.wd)} withdrawn` + (T.inv ? ` · net ${T.inv - T.wd < 0 ? '−' : ''}${money(Math.abs(T.inv - T.wd))}` : '') : 'SIPs, stocks, deposits'}</div></div>${T.big > 0 ? `
     <div class="stat"><div class="label">🚗 Big purchases</div><div class="value">${money(T.big)}</div><div class="note">One-time, not in Spent</div></div>` : ''}
-    <div class="stat"><div class="label">Left over</div><div class="value" style="color:${T.left < 0 ? 'var(--danger)' : 'inherit'}">${T.left < 0 ? '−' : ''}${money(Math.abs(T.left))}</div><div class="note">${rate == null ? 'No income in this period' : `You kept ${rate}% of what came in`}</div></div>`;
+    <div class="stat"><div class="label">Left over</div><div class="value" style="color:${T.left < 0 && !pend ? 'var(--danger)' : 'inherit'}">${T.left < 0 ? '−' : ''}${money(Math.abs(T.left))}</div><div class="note">${pend ? `⏳ Salary not in yet. If your usual ${money(pend.usual)} arrives, you'll have kept about ${Math.round((T.inc + pend.usual - T.spent - T.big) / (T.inc + pend.usual) * 100)}% so far` : rate == null ? 'No income in this period' : `You kept ${rate}% of what came in`}</div></div>`;
   renderReview(list);
   renderSocial();
   renderNag();
@@ -2596,8 +2610,8 @@ function openWrapped(m){
   const sal = L.filter(isSal).sort((a, b) => a.date.localeCompare(b.date));
   const dshort = d => new Date(d).toLocaleDateString('en-IN', {day: 'numeric', month: 'short'});
   const salTxt = sal.length ? `Salary ${money(sal.reduce((a, t) => a + t.amount, 0))}, credited ${sal.map(t => dshort(t.date)).join(' & ')}` : '';
-  const anySal = S.txns.some(isSal);
-  const salWarn = !anySal ? '' : sal.length === 0 ? `⚠️ No salary is counted for ${monthLabel(m)}. If it arrived early or late, open that salary payment and change <b>Counts for month</b>.`
+  const anySal = S.txns.some(isSal), pend = salaryPending(m);
+  const salWarn = !anySal || pend ? '' : sal.length === 0 ? `⚠️ No salary is counted for ${monthLabel(m)}. If it arrived early or late, open that salary payment and change <b>Counts for month</b>.`
     : sal.length > 1 && sal.filter(t => t.amount > 0.5 * Math.max(...sal.map(x => x.amount))).length > 1 ? `⚠️ ${sal.length} salary payments are counted for ${monthLabel(m)} (${sal.map(t => dshort(t.date)).join(', ')}). If one belongs to another month, open it and change <b>Counts for month</b>.` : '';
   const ms = allMonths(), i = ms.indexOf(m);
   const card = (k, v, s, cls) => `<div class="wcard ${cls || ''}"><div class="k">${k}</div><div class="v">${v}</div>${s ? `<div class="s">${s}</div>` : ''}</div>`;
@@ -2605,15 +2619,15 @@ function openWrapped(m){
     ${card('You spent', money(T.spent), delta == null ? '' : delta === 0 ? 'the same as last month' : `${Math.abs(delta)}% ${delta > 0 ? 'more' : 'less'} than ${monthLabel(prev, true)} ${delta > 0 ? '📈' : '📉'}`, 'hero')}
     ${salWarn ? `<div class="hint" style="margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--surface-2)">${salWarn} <button class="btn" id="wSal" style="font-size:13px;padding:4px 10px;margin-left:4px">Show salary payments</button></div>` : ''}
     <div class="wgrid" style="margin-top:10px">
-      ${card('Money in', money(T.inc), salTxt || (T.inc ? 'income this month' : 'no income counted'))}
-      ${rate != null ? card('Kept', `${rate}%`, `${money(Math.max(0, T.inc - T.spent - T.big))} of ${money(T.inc)}`) : ''}
+      ${card('Money in', money(T.inc), pend ? `⏳ salary not credited yet · usually ${money(pend.usual)}` : salTxt || (T.inc ? 'income this month' : 'no income counted'))}
+      ${pend ? card('Kept so far', `~${Math.round((T.inc + pend.usual - T.spent - T.big) / (T.inc + pend.usual) * 100)}%`, `if your usual salary arrives`) : rate != null ? card('Kept', `${rate}%`, `${money(T.inc - T.spent - T.big)} of ${money(T.inc)}`) : card('Kept', '—', 'no money came in')}
       ${sc ? card('Health score', sc.score, psc ? `${sc.score >= psc.score ? '▲' : '▼'} ${Math.abs(sc.score - psc.score)} vs last month` : '') : ''}
       ${cats[0] ? card('Top everyday spend', `${(CAT_BY_NAME[cats[0].n] || {e: ''}).e} ${esc(cats[0].n)}`.replace(/^(.{0,40}).*$/, '$1'), money(cats[0].sum)) : ''}
       ${topM ? card('Favourite place', esc(topM[0]), money(topM[1])) : ''}
       ${seen.length ? card('No-spend days', zero, zero >= 5 ? 'nice restraint 🌱' : 'days with no spending') : ''}
       ${bigDay ? card('Biggest day', new Date(bigDay[0]).toLocaleDateString('en-IN', {day: 'numeric', month: 'short'}), money(bigDay[1])) : ''}
       ${bud.length ? card('Budgets kept', `${kept} of ${bud.length}`, kept === bud.length ? 'every single one 👏' : 'categories within budget') : ''}
-      ${T.inv ? card('Invested', money(T.inv), 'SIPs, stocks, deposits') : ''}
+      ${card('Invested', money(T.inv), T.inv ? 'SIPs, stocks, deposits' : 'nothing invested this month')}
     </div>`;
   $('wsheet').dataset.m = m; $('wsheet').classList.remove('hidden');
 }
@@ -2731,6 +2745,8 @@ $('btnExportX').onclick = async () => {
 async function renderSettings(){
   $('backupInfo').textContent = S.lastBackup ? `Last backup: ${new Date(S.lastBackup).toLocaleDateString('en-IN', {day: 'numeric', month: 'short', year: 'numeric'})}` : 'No backup yet.';
   renderCustomList(); renderRules(); renderLockSet();
+  $('salModeBox').classList.toggle('hidden', MS() !== 1);
+  document.querySelectorAll('input[name=salMode]').forEach(r => { r.checked = r.value === (S.salMode || 'earned'); });
   $('msSel').innerHTML = Array.from({length: 28}, (_, i) => i + 1).map(d => `<option value="${d}" ${d === MS() ? 'selected' : ''}>${d === 1 ? '1st (calendar month)' : ordinal(d)}</option>`).join('');
   const sug = suggestMonthStart();
   $('msSuggest').innerHTML = sug && MS() === 1 ? `💡 Your salary usually arrives around the end of the month. Starting months on the <b>${ordinal(sug)}</b> keeps each salary with the month it pays for. <button class="btn" id="msUse" style="margin-left:6px;font-size:13px;padding:5px 10px">Use the ${ordinal(sug)}</button>` : '';
@@ -2746,6 +2762,7 @@ function setMonthStart(d){
   toast(d === 1 ? 'Months now follow the calendar (1st to end of month).' : `Months now run from the ${ordinal(d)} to the ${ordinal(d - 1)}.`);
 }
 $('msSel').onchange = e => setMonthStart(+e.target.value);
+document.addEventListener('change', e => { if(e.target.name !== 'salMode') return; S.salMode = e.target.value; S.month = 'all'; save(); render(); toast(S.salMode === 'spend' ? 'Each salary now counts for the month you spend it in.' : 'Each salary now counts for the month you earned it.'); });
 document.addEventListener('click', e => { if(e.target.id === 'msUse') setMonthStart(suggestMonthStart()); });
 $('btnClear2').onclick = () => { closeSettings(); $('btnClear').click(); }; $('setClose').onclick = closeSettings;
 $('settings').addEventListener('click', e => { if(e.target.id === 'settings') closeSettings(); });
